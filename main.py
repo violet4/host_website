@@ -1,17 +1,15 @@
 #!/usr/bin/env python3
 
 import argparse
-import mimetypes
 import os
 import re
 from pathlib import Path
-from urllib.parse import urlparse, urljoin
+from urllib.parse import urlparse
 
 import uvicorn
 from bs4 import BeautifulSoup
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import HTMLResponse, FileResponse
-from fastapi.staticfiles import StaticFiles
 
 app = FastAPI()
 
@@ -148,10 +146,7 @@ class DomainRewriter:
         file_path = self.content_root / path.lstrip('/')
         return file_path if file_path.exists() else None
 
-# Global variable to store the rewriter instance
-for k in ('DOMAIN', 'DIRECTORY'):
-    print(k, os.environ.get(k))
-rewriter = DomainRewriter(os.environ.get('DOMAIN'), os.environ.get('DIRECTORY'))
+rewriter = DomainRewriter('', '')
 
 @app.get("/{full_path:path}")
 async def serve_content(full_path: str, request: Request):
@@ -210,6 +205,8 @@ async def serve_content(full_path: str, request: Request):
 
 
 def main():
+    global rewriter
+
     parser = argparse.ArgumentParser(description='Host a website with automatic domain rewriting')
     parser.add_argument('domain', help='The original domain to rewrite (e.g., originaldomain.com)')
     parser.add_argument('-p', '--port', type=int, default=8000, help='Port to listen on (default: 8000)')
@@ -218,16 +215,13 @@ def main():
 
     args = parser.parse_args()
 
-    os.environ.update({
-        'DOMAIN': args.domain,
-        'DIRECTORY': args.directory,
-    })
+    rewriter = DomainRewriter(args.domain, args.directory)
 
     print(f"Starting server for {args.domain} at http://{args.host}:{args.port}")
     print(f"Serving content from: {os.path.abspath(args.directory)}")
     print("Press Ctrl+C to stop the server")
 
-    uvicorn.run('main:app', host=args.host, port=args.port, reload=True)
+    uvicorn.run(app, host=args.host, port=args.port)
 
 if __name__ == "__main__":
     main()
